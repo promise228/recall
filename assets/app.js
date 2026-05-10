@@ -251,7 +251,7 @@ function renderNextMediaBatch() {
 function renderMediaPreview(item, altText, eager) {
   if (item.type === "video") {
     const video = document.createElement("video");
-    video.src = item.src;
+    video.src = toAssetUrl(item.src);
     video.muted = true;
     video.playsInline = true;
     video.preload = eager ? "metadata" : "none";
@@ -259,7 +259,7 @@ function renderMediaPreview(item, altText, eager) {
   }
 
   const image = document.createElement("img");
-  image.src = item.thumb || item.src;
+  image.src = toAssetUrl(item.thumb || item.src);
   image.alt = altText;
   image.loading = eager ? "eager" : "lazy";
   image.decoding = "async";
@@ -313,7 +313,7 @@ function renderLightbox() {
 
   if (item.type === "video") {
     const video = document.createElement("video");
-    video.src = item.src;
+    video.src = toAssetUrl(item.src);
     video.controls = true;
     video.autoplay = true;
     video.playsInline = true;
@@ -321,11 +321,49 @@ function renderLightbox() {
     return;
   }
 
-  const image = document.createElement("img");
-  image.src = item.src;
-  image.alt = `${album.location} 第 ${activeMediaIndex + 1} 张`;
-  image.decoding = "async";
-  lightboxMedia.appendChild(image);
+  const frame = document.createElement("div");
+  frame.className = "lightbox-image-frame is-loading";
+
+  const preview = document.createElement("img");
+  preview.className = "lightbox-preview-image";
+  preview.src = toAssetUrl(item.thumb || item.src);
+  preview.alt = `${album.location} 第 ${activeMediaIndex + 1} 张`;
+  preview.decoding = "async";
+  frame.appendChild(preview);
+
+  const status = document.createElement("div");
+  status.className = "lightbox-status";
+  status.textContent = "正在加载原图…";
+  frame.appendChild(status);
+
+  const original = new Image();
+  original.className = "lightbox-full-image";
+  original.alt = preview.alt;
+  original.decoding = "async";
+
+  original.addEventListener("load", () => {
+    if (frame.parentElement !== lightboxMedia) {
+      return;
+    }
+
+    frame.appendChild(original);
+    frame.classList.remove("is-loading");
+    frame.classList.add("is-ready");
+    status.remove();
+  });
+
+  original.addEventListener("error", () => {
+    if (frame.parentElement !== lightboxMedia) {
+      return;
+    }
+
+    frame.classList.remove("is-loading");
+    frame.classList.add("has-error");
+    status.textContent = "原图加载失败，当前显示缩略图";
+  });
+
+  lightboxMedia.appendChild(frame);
+  original.src = toAssetUrl(item.src);
 }
 
 function switchView(nextView, prevView) {
@@ -378,6 +416,18 @@ function parseAlbumHash(hash) {
   } catch {
     return "";
   }
+}
+
+function toAssetUrl(path) {
+  if (typeof path !== "string" || !path) {
+    return "";
+  }
+
+  return path
+    .split("/")
+    .map((segment, index) => (index === 0 && segment === "." ? "." : encodeURIComponent(segment)))
+    .join("/")
+    .replace(".%2F", "./");
 }
 
 function isLightboxOpen() {
