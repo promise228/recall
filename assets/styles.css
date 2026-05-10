@@ -129,7 +129,7 @@ button {
 
 .timeline-entry {
   position: relative;
-  width: 100%;
+  width: calc(100% - 54px);
   margin-left: 22px;
   padding: 20px 18px;
   border: 1px solid var(--line);
