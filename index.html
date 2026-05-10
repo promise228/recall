@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#e0b04a">
+  <title>我们的相册</title>
+  <link rel="stylesheet" href="./assets/styles.css">
+</head>
+<body>
+  <main class="app-shell">
+    <section id="homeView" class="view is-active" aria-labelledby="homeTitle">
+      <header class="home-header">
+        <p id="todayLabel" class="home-date"></p>
+        <h1 id="homeTitle">我们的相册</h1>
+      </header>
+
+      <section class="timeline-section" aria-labelledby="timelineTitle">
+        <h2 id="timelineTitle" class="sr-only">相册时间线</h2>
+        <div id="albumList" class="timeline-list" aria-live="polite"></div>
+      </section>
+    </section>
+
+    <section id="galleryView" class="view" aria-labelledby="galleryTitle" hidden>
+      <header class="gallery-header">
+        <button id="backButton" class="back-button" type="button" aria-label="返回首页">返回</button>
+        <p id="galleryDate" class="gallery-date"></p>
+        <h2 id="galleryTitle" class="gallery-place"></h2>
+      </header>
+
+      <section class="gallery-section" aria-labelledby="galleryGridTitle">
+        <h3 id="galleryGridTitle" class="sr-only">相册内容</h3>
+        <div id="galleryGrid" class="media-grid" aria-live="polite"></div>
+      </section>
+    </section>
+  </main>
+
+  <aside id="lightbox" class="lightbox" aria-hidden="true">
+    <div class="lightbox-backdrop" data-close-lightbox="true"></div>
+    <div class="lightbox-panel" role="dialog" aria-modal="true" aria-label="图片预览">
+      <button id="closeLightbox" class="icon-button icon-close" type="button" aria-label="关闭预览">×</button>
+      <button id="prevMedia" class="icon-button nav-button nav-button-left" type="button" aria-label="上一张">‹</button>
+      <div id="lightboxMedia" class="lightbox-media"></div>
+      <button id="nextMedia" class="icon-button nav-button nav-button-right" type="button" aria-label="下一张">›</button>
+    </div>
+  </aside>
+
+  <script src="./assets/gallery-data.js"></script>
+  <script src="./assets/app.js"></script>
+</body>
+</html>
