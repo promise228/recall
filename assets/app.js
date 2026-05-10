@@ -15,11 +15,28 @@ const prevMediaButton = document.getElementById("prevMedia");
 const nextMediaButton = document.getElementById("nextMedia");
 
 const albumMap = new Map(albums.map((album) => [album.id, album]));
+const galleryBatchSize = 18;
+const galleryLoadSentinel = document.createElement("div");
 
 let activeAlbumId = null;
 let activeMediaIndex = 0;
 let albumScrollTop = 0;
 let touchStartX = 0;
+let renderedMediaCount = 0;
+
+galleryLoadSentinel.className = "gallery-load-sentinel";
+
+const batchObserver = "IntersectionObserver" in window
+  ? new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting || !activeAlbumId) {
+          return;
+        }
+
+        renderNextMediaBatch();
+      });
+    }, { rootMargin: "240px 0px" })
+  : null;
 
 todayLabel.textContent = formatChineseDate(new Date());
 
@@ -166,6 +183,10 @@ function showAlbum(albumId) {
 
 function showHome() {
   activeAlbumId = null;
+  renderedMediaCount = 0;
+  if (batchObserver) {
+    batchObserver.disconnect();
+  }
   closeLightbox(true);
   switchView(homeView, galleryView);
   window.scrollTo({ top: albumScrollTop, behavior: "smooth" });
@@ -174,25 +195,57 @@ function showHome() {
 function renderGallery(album) {
   galleryDate.textContent = getAlbumDisplayDate(album);
   galleryTitle.textContent = album.location;
+  renderedMediaCount = 0;
+
+  if (batchObserver) {
+    batchObserver.disconnect();
+  }
 
   if (!album.media.length) {
     galleryGrid.innerHTML = '<div class="empty-state">这个相册里暂时没有内容。</div>';
     return;
   }
 
+  galleryGrid.replaceChildren();
+  renderNextMediaBatch();
+}
+
+function renderNextMediaBatch() {
+  const album = albumMap.get(activeAlbumId);
+  if (!album || renderedMediaCount >= album.media.length) {
+    if (batchObserver) {
+      batchObserver.disconnect();
+    }
+    galleryLoadSentinel.remove();
+    return;
+  }
+
+  const nextItems = album.media.slice(renderedMediaCount, renderedMediaCount + galleryBatchSize);
   const fragment = document.createDocumentFragment();
 
-  album.media.forEach((item, index) => {
+  nextItems.forEach((item, offset) => {
+    const index = renderedMediaCount + offset;
     const button = document.createElement("button");
     button.type = "button";
     button.className = "media-card";
     button.setAttribute("aria-label", `查看第 ${index + 1} 张`);
-    button.appendChild(renderMediaPreview(item, `${album.location} 第 ${index + 1} 张`, false));
+    button.appendChild(renderMediaPreview(item, `${album.location} 第 ${index + 1} 张`, index < 4));
     button.addEventListener("click", () => openLightbox(index));
     fragment.appendChild(button);
   });
 
-  galleryGrid.replaceChildren(fragment);
+  galleryGrid.appendChild(fragment);
+  renderedMediaCount += nextItems.length;
+
+  if (renderedMediaCount < album.media.length) {
+    galleryGrid.appendChild(galleryLoadSentinel);
+    if (batchObserver) {
+      batchObserver.disconnect();
+      batchObserver.observe(galleryLoadSentinel);
+    }
+  } else {
+    galleryLoadSentinel.remove();
+  }
 }
 
 function renderMediaPreview(item, altText, eager) {
@@ -206,9 +259,13 @@ function renderMediaPreview(item, altText, eager) {
   }
 
   const image = document.createElement("img");
-  image.src = item.src;
+  image.src = item.thumb || item.src;
   image.alt = altText;
   image.loading = eager ? "eager" : "lazy";
+  image.decoding = "async";
+  if (!eager) {
+    image.fetchPriority = "low";
+  }
   return image;
 }
 
@@ -267,6 +324,7 @@ function renderLightbox() {
   const image = document.createElement("img");
   image.src = item.src;
   image.alt = `${album.location} 第 ${activeMediaIndex + 1} 张`;
+  image.decoding = "async";
   lightboxMedia.appendChild(image);
 }
 
