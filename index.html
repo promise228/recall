@@ -3,34 +3,52 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="theme-color" content="#e0b04a">
+  <meta name="theme-color" content="#a45d36">
   <title>高健原的家庭相册</title>
   <link rel="stylesheet" href="./assets/styles.css">
 </head>
 <body>
   <main class="app-shell">
     <section id="homeView" class="view is-active" aria-labelledby="homeTitle">
-      <header class="home-header">
-        <p id="todayLabel" class="home-date"></p>
-        <h1 id="homeTitle">高健原的家庭相册</h1>
-      </header>
+      <section class="binder-panel binder-panel-home">
+        <div class="binder-rings" aria-hidden="true">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+        <div class="binder-sheet">
+          <header class="home-header">
+            <p id="todayLabel" class="home-date"></p>
+            <h1 id="homeTitle">高健原的家庭相册</h1>
+          </header>
 
-      <section class="timeline-section" aria-labelledby="timelineTitle">
-        <h2 id="timelineTitle" class="sr-only">相册时间线</h2>
-        <div id="albumList" class="timeline-list" aria-live="polite"></div>
+          <section class="timeline-section" aria-labelledby="timelineTitle">
+            <h2 id="timelineTitle" class="sr-only">相册时间线</h2>
+            <div id="albumList" class="timeline-list" aria-live="polite"></div>
+          </section>
+        </div>
       </section>
     </section>
 
     <section id="galleryView" class="view" aria-labelledby="galleryTitle" hidden>
-      <header class="gallery-header">
-        <button id="backButton" class="back-button" type="button" aria-label="返回首页">返回</button>
-        <p id="galleryDate" class="gallery-date"></p>
-        <h2 id="galleryTitle" class="gallery-place"></h2>
-      </header>
+      <section class="binder-panel binder-panel-gallery">
+        <div class="binder-rings" aria-hidden="true">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+        <div class="binder-sheet">
+          <header class="gallery-header">
+            <button id="backButton" class="back-button" type="button" aria-label="返回首页">返回</button>
+            <p id="galleryDate" class="gallery-date"></p>
+            <h2 id="galleryTitle" class="gallery-place"></h2>
+          </header>
 
-      <section class="gallery-section" aria-labelledby="galleryGridTitle">
-        <h3 id="galleryGridTitle" class="sr-only">相册内容</h3>
-        <div id="galleryGrid" class="media-grid" aria-live="polite"></div>
+          <section class="gallery-section" aria-labelledby="galleryGridTitle">
+            <h3 id="galleryGridTitle" class="sr-only">相册内容</h3>
+            <div id="galleryGrid" class="media-grid" aria-live="polite"></div>
+          </section>
+        </div>
       </section>
     </section>
   </main>
