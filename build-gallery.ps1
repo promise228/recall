@@ -4,6 +4,7 @@ $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $assetDir = Join-Path $root "assets"
 $thumbRoot = Join-Path $assetDir "thumbs"
 $outputPath = Join-Path $assetDir "gallery-data.js"
+$targetOriginalBytes = 1MB
 
 $imageExtensions = @(".jpg", ".jpeg", ".png", ".webp", ".gif")
 $thumbableExtensions = @(".jpg", ".jpeg", ".png")
@@ -41,6 +42,120 @@ function Get-JpegCodec {
   return [System.Drawing.Imaging.ImageCodecInfo]::GetImageEncoders() |
     Where-Object { $_.MimeType -eq "image/jpeg" } |
     Select-Object -First 1
+}
+
+function Save-JpegVariant {
+  param(
+    [System.Drawing.Image]$SourceImage,
+    [string]$DestinationPath,
+    [double]$Scale,
+    [int]$Quality
+  )
+
+  $targetWidth = [Math]::Max(1, [int][Math]::Round($SourceImage.Width * $Scale))
+  $targetHeight = [Math]::Max(1, [int][Math]::Round($SourceImage.Height * $Scale))
+
+  $bitmap = $null
+  $graphics = $null
+
+  try {
+    $bitmap = New-Object System.Drawing.Bitmap($targetWidth, $targetHeight)
+    $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+    $graphics.CompositingQuality = [System.Drawing.Drawing2D.CompositingQuality]::HighQuality
+    $graphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+    $graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
+    $graphics.DrawImage($SourceImage, 0, 0, $targetWidth, $targetHeight)
+
+    $qualityEncoder = [System.Drawing.Imaging.Encoder]::Quality
+    $encoderParameters = New-Object System.Drawing.Imaging.EncoderParameters(1)
+    $encoderParameters.Param[0] = New-Object System.Drawing.Imaging.EncoderParameter($qualityEncoder, [long]$Quality)
+    $bitmap.Save($DestinationPath, (Get-JpegCodec), $encoderParameters)
+  }
+  finally {
+    if ($graphics) {
+      $graphics.Dispose()
+    }
+    if ($bitmap) {
+      $bitmap.Dispose()
+    }
+  }
+}
+
+function Ensure-OriginalUnderSize {
+  param(
+    [System.IO.FileInfo]$File,
+    [long]$MaxBytes = $targetOriginalBytes
+  )
+
+  if ($File.Extension.ToLowerInvariant() -notin @(".jpg", ".jpeg")) {
+    return $File
+  }
+
+  if ($File.Length -le $MaxBytes) {
+    return $File
+  }
+
+  $sourceImage = $null
+  $memoryStream = $null
+  $tempPath = "$($File.FullName).tmp.jpg"
+  $success = $false
+
+  try {
+    $memoryStream = New-Object System.IO.MemoryStream(, [System.IO.File]::ReadAllBytes($File.FullName))
+    $sourceImage = [System.Drawing.Image]::FromStream($memoryStream)
+
+    $scales = @(1.0, 0.9, 0.82, 0.74, 0.66, 0.58, 0.5, 0.42, 0.34, 0.28, 0.22)
+    $qualities = @(86, 78, 70, 62, 54, 46, 38)
+
+    foreach ($scale in $scales) {
+      foreach ($quality in $qualities) {
+        Save-JpegVariant -SourceImage $sourceImage -DestinationPath $tempPath -Scale $scale -Quality $quality
+        $tempItem = Get-Item -LiteralPath $tempPath
+
+        if ($tempItem.Length -le $MaxBytes) {
+          $success = $true
+          break
+        }
+      }
+
+      if ($success) {
+        break
+      }
+    }
+  }
+  finally {
+    if ($sourceImage) {
+      $sourceImage.Dispose()
+    }
+    if ($memoryStream) {
+      $memoryStream.Dispose()
+    }
+  }
+
+  if ($success) {
+    $tempBytes = [System.IO.File]::ReadAllBytes($tempPath)
+
+    for ($retry = 0; $retry -lt 8; $retry++) {
+      try {
+        [System.IO.File]::WriteAllBytes($File.FullName, $tempBytes)
+        Remove-Item -LiteralPath $tempPath -Force
+        return Get-Item -LiteralPath $File.FullName
+      }
+      catch {
+        if ($retry -eq 7) {
+          break
+        }
+
+        Start-Sleep -Milliseconds 250
+      }
+    }
+  }
+
+  if (Test-Path -LiteralPath $tempPath) {
+    Remove-Item -LiteralPath $tempPath -Force
+  }
+
+  return $File
 }
 
 function Get-ThumbnailRelativePath {
@@ -132,17 +247,22 @@ $albums = @(
           Where-Object { $supportedExtensions -contains $_.Extension.ToLowerInvariant() } |
           Sort-Object Name |
           ForEach-Object {
-            $extension = $_.Extension.ToLowerInvariant()
+            $file = $_
+            if ($thumbableExtensions -contains $file.Extension.ToLowerInvariant()) {
+              $file = Ensure-OriginalUnderSize -File $file
+            }
+
+            $extension = $file.Extension.ToLowerInvariant()
             $mediaType = if ($videoExtensions -contains $extension) { "video" } else { "image" }
-            $sourcePath = "./$($folder.Name)/$($_.Name)".Replace("\", "/")
+            $sourcePath = "./$($folder.Name)/$($file.Name)".Replace("\", "/")
             $item = @{
               type = $mediaType
               src = $sourcePath
-              name = $_.Name
+              name = $file.Name
             }
 
             if ($mediaType -eq "image") {
-              $thumbPath = Ensure-Thumbnail -File $_ -FolderName $folder.Name
+              $thumbPath = Ensure-Thumbnail -File $file -FolderName $folder.Name
               if ($thumbPath) {
                 $item.thumb = $thumbPath
               }
@@ -193,6 +313,7 @@ Set-Content -LiteralPath $outputPath -Value $content -Encoding UTF8
 [PSCustomObject]@{
   Output = $outputPath
   ThumbnailRoot = $thumbRoot
+  TargetOriginalBytes = $targetOriginalBytes
   AlbumCount = ($albums | Measure-Object).Count
   MediaCount = ($albums | ForEach-Object { $_.mediaCount } | Measure-Object -Sum).Sum
 }
